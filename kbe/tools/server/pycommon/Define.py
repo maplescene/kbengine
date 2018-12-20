@@ -19,6 +19,18 @@ WATCHER_TYPE			= 12
 INTERFACES_TYPE			= 13
 COMPONENT_END_TYPE		= 14
 
+VALID_COMPONENT_TYPE_FOR_RUN = [
+	DBMGR_TYPE, 
+	LOGINAPP_TYPE, 
+	BASEAPPMGR_TYPE, 
+	CELLAPPMGR_TYPE, 
+	CELLAPP_TYPE, 
+	BASEAPP_TYPE, 
+	LOGGER_TYPE, 
+	BOTS_TYPE, 
+	INTERFACES_TYPE, 
+]
+
 # ComponentName to type
 COMPONENT_NAME2TYPE = {
 	"unknown"		: UNKNOWN_COMPONENT_TYPE,
@@ -57,12 +69,12 @@ COMPONENT_NAME = (
 
 if sys.hexversion >= 0x02060000:
 	import io
-	def BytesIO():
-		return io.BytesIO()
+	def BytesIO(bytesData = "".encode("utf-8")):
+		return io.BytesIO(bytesData)
 else:
 	import StringIO
-	def BytesIO():
-		return StringIO.StringIO()
+	def BytesIO(bytesData = ""):
+		return StringIO.StringIO(bytesData)
 
 if sys.hexversion >= 0x03000000:
 	import configparser

@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #ifndef KBE_OBJECTPOOL_H
 #define KBE_OBJECTPOOL_H
@@ -41,8 +23,23 @@ namespace KBEngine{
 // 每5分钟检查一次瘦身
 #define OBJECT_POOL_REDUCING_TIME_OUT	300 * stampsPerSecondD()
 
+// 追踪对象分配处
+#define OBJECTPOOL_POINT fmt::format("{}#{}", __FUNCTION__, __LINE__).c_str() 
+
 template< typename T >
 class SmartPoolObject;
+
+class ObjectPoolLogPoint
+{
+public:
+	ObjectPoolLogPoint() :
+		count(0)
+	{
+
+	}
+
+	int count;
+};
 
 /*
 	一些对象会非常频繁的被创建， 例如：MemoryStream, Bundle, TCPPacket等等
@@ -59,11 +56,12 @@ public:
 		objects_(),
 		max_(OBJECT_POOL_INIT_MAX_SIZE),
 		isDestroyed_(false),
-		mutex_(),
+		pMutex_(new THREADMUTEX()),
 		name_(name),
 		total_allocs_(0),
 		obj_count_(0),
-		lastReducingCheckTime_(timestamp())
+		lastReducingCheckTime_(timestamp()),
+		logPoints_()
 	{
 	}
 
@@ -71,28 +69,31 @@ public:
 		objects_(),
 		max_((max == 0 ? 1 : max)),
 		isDestroyed_(false),
-		mutex_(),
+		pMutex_(new THREADMUTEX()),
 		name_(name),
 		total_allocs_(0),
 		obj_count_(0),
-		lastReducingCheckTime_(timestamp())
+		lastReducingCheckTime_(timestamp()),
+		logPoints_()
 	{
 	}
 
 	~ObjectPool()
 	{
 		destroy();
+		SAFE_RELEASE(pMutex_);
 	}	
 	
 	void destroy()
 	{
-		mutex_.lockMutex();
+		pMutex_->lockMutex();
 
 		isDestroyed_ = true;
 
 		typename OBJECTS::iterator iter = objects_.begin();
 		for(; iter!=objects_.end(); ++iter)
 		{
+			(*iter)->isEnabledPoolObject(false);
 			if(!(*iter)->destructorPoolObject())
 			{
 				delete (*iter);
@@ -101,15 +102,32 @@ public:
 				
 		objects_.clear();	
 		obj_count_ = 0;
-		mutex_.unlockMutex();
+		pMutex_->unlockMutex();
 	}
 
-	const OBJECTS& objects(void) const { return objects_; }
+	const OBJECTS& objects(void) const 
+	{ 
+		return objects_; 
+	}
+
+	void pMutex(KBEngine::thread::ThreadMutexNull* pMutex)
+	{
+		SAFE_RELEASE(pMutex_);
+		pMutex_ = pMutex;
+	}
+
+	KBEngine::thread::ThreadMutexNull* pMutex()
+	{
+		return pMutex_;
+	}
 
 	void assignObjs(unsigned int preAssignVal = OBJECT_POOL_INIT_SIZE)
 	{
-		for(unsigned int i=0; i<preAssignVal; ++i){
-			objects_.push_back(new T);
+		for(unsigned int i=0; i<preAssignVal; ++i)
+		{
+			T* t = new T();
+			t->isEnabledPoolObject(false);
+			objects_.push_back(t);
 			++total_allocs_;
 			++obj_count_;
 		}
@@ -120,9 +138,9 @@ public:
 		创建一个新的， 这个对象必须是继承自T的。
 	*/
 	template<typename T1>
-	T* createObject(void)
+	T* createObject(const std::string& logPoint)
 	{
-		mutex_.lockMutex();
+		pMutex_->lockMutex();
 
 		while(true)
 		{
@@ -131,15 +149,18 @@ public:
 				T* t = static_cast<T1*>(*objects_.begin());
 				objects_.pop_front();
 				--obj_count_;
+				incLogPoint(logPoint);
+				t->poolObjectCreatePoint(logPoint);
 				t->onEabledPoolObject();
-				mutex_.unlockMutex();
+				t->isEnabledPoolObject(true);
+				pMutex_->unlockMutex();
 				return t;
 			}
 
 			assignObjs();
 		}
 
-		mutex_.unlockMutex();
+		pMutex_->unlockMutex();
 
 		return NULL;
 	}
@@ -148,9 +169,9 @@ public:
 		创建一个对象。 如果缓冲里已经创建则返回现有的，否则
 		创建一个新的。
 	*/
-	T* createObject(void)
+	T* createObject(const std::string& logPoint)
 	{
-		mutex_.lockMutex();
+		pMutex_->lockMutex();
 
 		while(true)
 		{
@@ -159,15 +180,18 @@ public:
 				T* t = static_cast<T*>(*objects_.begin());
 				objects_.pop_front();
 				--obj_count_;
+				incLogPoint(logPoint);
+				t->poolObjectCreatePoint(logPoint);
 				t->onEabledPoolObject();
-				mutex_.unlockMutex();
+				t->isEnabledPoolObject(true);
+				pMutex_->unlockMutex();
 				return t;
 			}
 
 			assignObjs();
 		}
 
-		mutex_.unlockMutex();
+		pMutex_->unlockMutex();
 
 		return NULL;
 	}
@@ -177,9 +201,9 @@ public:
 	*/
 	void reclaimObject(T* obj)
 	{
-		mutex_.lockMutex();
+		pMutex_->lockMutex();
 		reclaimObject_(obj);
-		mutex_.unlockMutex();
+		pMutex_->unlockMutex();
 	}
 
 	/**
@@ -187,7 +211,7 @@ public:
 	*/
 	void reclaimObject(std::list<T*>& objs)
 	{
-		mutex_.lockMutex();
+		pMutex_->lockMutex();
 
 		typename std::list< T* >::iterator iter = objs.begin();
 		for(; iter != objs.end(); ++iter)
@@ -197,7 +221,7 @@ public:
 		
 		objs.clear();
 
-		mutex_.unlockMutex();
+		pMutex_->unlockMutex();
 	}
 
 	/**
@@ -205,7 +229,7 @@ public:
 	*/
 	void reclaimObject(std::vector< T* >& objs)
 	{
-		mutex_.lockMutex();
+		pMutex_->lockMutex();
 
 		typename std::vector< T* >::iterator iter = objs.begin();
 		for(; iter != objs.end(); ++iter)
@@ -215,7 +239,7 @@ public:
 		
 		objs.clear();
 
-		mutex_.unlockMutex();
+		pMutex_->unlockMutex();
 	}
 
 	/**
@@ -223,7 +247,7 @@ public:
 	*/
 	void reclaimObject(std::queue<T*>& objs)
 	{
-		mutex_.lockMutex();
+		pMutex_->lockMutex();
 
 		while(!objs.empty())
 		{
@@ -232,7 +256,7 @@ public:
 			reclaimObject_(t);
 		}
 
-		mutex_.unlockMutex();
+		pMutex_->unlockMutex();
 	}
 
 	size_t size(void) const { return obj_count_; }
@@ -241,12 +265,12 @@ public:
 	{
 		char buf[1024];
 
-		mutex_.lockMutex();
+		pMutex_->lockMutex();
 
 		sprintf(buf, "ObjectPool::c_str(): name=%s, objs=%d/%d, isDestroyed=%s.\n", 
-			name_.c_str(), (int)obj_count_, (int)max_, (isDestroyed ? "true" : "false"));
+			name_.c_str(), (int)obj_count_, (int)max_, (isDestroyed() ? "true" : "false"));
 
-		mutex_.unlockMutex();
+		pMutex_->unlockMutex();
 
 		return buf;
 	}
@@ -256,6 +280,20 @@ public:
 
 	bool isDestroyed() const { return isDestroyed_; }
 
+	std::map<std::string, ObjectPoolLogPoint>& logPoints() {
+		return logPoints_;
+	}
+
+	void incLogPoint(const std::string& logPoint)
+	{
+		++logPoints_[logPoint].count;
+	}
+
+	void decLogPoint(const std::string& logPoint)
+	{
+		--logPoints_[logPoint].count;
+	}
+
 protected:
 	/**
 		回收一个对象
@@ -264,8 +302,12 @@ protected:
 	{
 		if(obj != NULL)
 		{
+			decLogPoint(obj->poolObjectCreatePoint());
+
 			// 先重置状态
 			obj->onReclaimObject();
+			obj->isEnabledPoolObject(false);
+			obj->poolObjectCreatePoint("");
 
 			if(size() >= max_ || isDestroyed_)
 			{
@@ -286,11 +328,14 @@ protected:
 			// 小于等于则刷新检查时间
 			lastReducingCheckTime_ = now_timestamp;
 		}
-		else if (lastReducingCheckTime_ - now_timestamp > OBJECT_POOL_REDUCING_TIME_OUT)
+		else if (now_timestamp - lastReducingCheckTime_ > OBJECT_POOL_REDUCING_TIME_OUT)
 		{
 			// 长时间大于OBJECT_POOL_INIT_SIZE未使用的对象则开始做清理工作
 			size_t reducing = std::min(objects_.size(), std::min((size_t)OBJECT_POOL_INIT_SIZE, (size_t)(obj_count_ - OBJECT_POOL_INIT_SIZE)));
 			
+			//printf("ObjectPool::reclaimObject_(): start reducing..., name=%s, currsize=%d, OBJECT_POOL_INIT_SIZE=%d\n", 
+			//	name_.c_str(), (int)objects_.size(), OBJECT_POOL_INIT_SIZE);
+
 			while (reducing-- > 0)
 			{
 				T* t = static_cast<T*>(*objects_.begin());
@@ -299,6 +344,9 @@ protected:
 
 				--obj_count_;
 			}
+
+			//printf("ObjectPool::reclaimObject_(): reducing over, name=%s, currsize=%d\n", 
+			//	name_.c_str(), (int)objects_.size());
 
 			lastReducingCheckTime_ = now_timestamp;
 		}
@@ -313,7 +361,7 @@ protected:
 
 	// 一些原因导致锁还是有必要的
 	// 例如：dbmgr任务线程中输出log，cellapp中加载navmesh后的线程回调导致的log输出
-	THREADMUTEX mutex_;
+	THREADMUTEX* pMutex_;
 
 	std::string name_;
 
@@ -326,6 +374,9 @@ protected:
 	// 最后一次瘦身检查时间
 	// 如果长达OBJECT_POOL_REDUCING_TIME_OUT大于OBJECT_POOL_INIT_SIZE，则最多瘦身OBJECT_POOL_INIT_SIZE个
 	uint64 lastReducingCheckTime_;
+
+	// 记录的创建位置信息，用于追踪泄露点
+	std::map<std::string, ObjectPoolLogPoint> logPoints_;
 };
 
 /*
@@ -334,11 +385,21 @@ protected:
 class PoolObject
 {
 public:
+	PoolObject() : 
+		isEnabledPoolObject_(false)
+	{
+
+	}
+
 	virtual ~PoolObject(){}
 	virtual void onReclaimObject() = 0;
-	virtual void onEabledPoolObject(){}
+	virtual void onEabledPoolObject() {
+	}
 
-	virtual size_t getPoolObjectBytes(){ return 0; }
+	virtual size_t getPoolObjectBytes()
+	{ 
+		return 0; 
+	}
 
 	/**
 		池对象被析构前的通知
@@ -348,6 +409,34 @@ public:
 	{
 		return false;
 	}
+
+	bool isEnabledPoolObject() const
+	{
+		return isEnabledPoolObject_;
+	}
+
+	void isEnabledPoolObject(bool v)
+	{
+		isEnabledPoolObject_ = v;
+	}
+
+	void poolObjectCreatePoint(const std::string& logPoint)
+	{
+		poolObjectCreatePoint_ = logPoint;
+	}
+
+	const std::string& poolObjectCreatePoint() const
+	{
+		return poolObjectCreatePoint_;
+	}
+
+protected:
+
+	// 池对象是否处于激活（从池中已经取出）状态
+	bool isEnabledPoolObject_;
+
+	// 记录对象创建的位置
+	std::string poolObjectCreatePoint_;
 };
 
 template< typename T >
@@ -401,7 +490,7 @@ private:
 };
 
 
-#define NEW_POOL_OBJECT(TYPE) TYPE::createPoolObject();
+#define NEW_POOL_OBJECT(TYPE) TYPE::createPoolObject(OBJECTPOOL_POINT);
 
 
 }

@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 
 #if defined(DEFINE_IN_INTERFACE)
@@ -116,6 +98,51 @@ namespace KBEngine{
 				NAME##ClientMessagehandler0, MSG_LENGTH)						\
 																				\
 
+
+/**
+	Client消息宏，  只有一个参数的消息
+*/
+#if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
+	#undef CLIENT_MESSAGE_HANDLER_ARGS1
+#endif
+
+#if defined(DEFINE_IN_INTERFACE)
+#if defined(CLIENT)
+#define CLIENT_MESSAGE_HANDLER_ARGS1(NAME, ARG_TYPE1, ARG_NAME1)				\
+	void NAME##ClientMessagehandler1::handle(Network::Channel* pChannel,		\
+												KBEngine::MemoryStream& s)		\
+	{																			\
+			ARG_TYPE1 ARG_NAME1;												\
+			s >> ARG_NAME1;														\
+			KBEngine::CLIENTAPP::getSingleton().NAME(pChannel, ARG_NAME1);		\
+	}																			\
+
+#else
+#define CLIENT_MESSAGE_HANDLER_ARGS1(NAME, ARG_TYPE1, ARG_NAME1)				\
+	void NAME##ClientMessagehandler1::handle(Network::Channel* pChannel,		\
+												KBEngine::MemoryStream& s)		\
+	{																			\
+	}																			\
+		
+#endif
+#else
+#define CLIENT_MESSAGE_HANDLER_ARGS1(NAME, ARG_TYPE1, ARG_NAME1)				\
+	class NAME##ClientMessagehandler1 : public Network::MessageHandler			\
+	{																			\
+	public:																		\
+		virtual void handle(Network::Channel* pChannel,							\
+							KBEngine::MemoryStream& s);							\
+	};																			\
+
+#endif
+
+#define CLIENT_MESSAGE_DECLARE_ARGS1(NAME, MSG_LENGTH, ARG_TYPE1, ARG_NAME1)	\
+	CLIENT_MESSAGE_HANDLER_ARGS1(NAME, ARG_TYPE1, ARG_NAME1)					\
+	NETWORK_MESSAGE_DECLARE_ARGS1(Client, NAME,									\
+				NAME##ClientMessagehandler1, MSG_LENGTH, ARG_TYPE1, ARG_NAME1)	\
+																				\
+	
+
 /**
 	Client消息宏，  只有二个参数的消息
 */
@@ -168,48 +195,6 @@ namespace KBEngine{
 											ARG_TYPE2, ARG_NAME2)				\
 
 
-/**
-	Client消息宏，  只有一个参数的消息
-*/
-#if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
-	#undef CLIENT_MESSAGE_HANDLER_ARGS1
-#endif
-
-#if defined(DEFINE_IN_INTERFACE)
-#if defined(CLIENT)
-#define CLIENT_MESSAGE_HANDLER_ARGS1(NAME, ARG_TYPE1, ARG_NAME1)				\
-	void NAME##ClientMessagehandler1::handle(Network::Channel* pChannel,		\
-												KBEngine::MemoryStream& s)		\
-	{																			\
-			ARG_TYPE1 ARG_NAME1;												\
-			s >> ARG_NAME1;														\
-			KBEngine::CLIENTAPP::getSingleton().NAME(pChannel, ARG_NAME1);		\
-	}																			\
-
-#else
-#define CLIENT_MESSAGE_HANDLER_ARGS1(NAME, ARG_TYPE1, ARG_NAME1)				\
-	void NAME##ClientMessagehandler1::handle(Network::Channel* pChannel,		\
-												KBEngine::MemoryStream& s)		\
-	{																			\
-	}																			\
-		
-#endif
-#else
-#define CLIENT_MESSAGE_HANDLER_ARGS1(NAME, ARG_TYPE1, ARG_NAME1)				\
-	class NAME##ClientMessagehandler1 : public Network::MessageHandler			\
-	{																			\
-	public:																		\
-		virtual void handle(Network::Channel* pChannel,							\
-							KBEngine::MemoryStream& s);							\
-	};																			\
-
-#endif
-
-#define CLIENT_MESSAGE_DECLARE_ARGS1(NAME, MSG_LENGTH, ARG_TYPE1, ARG_NAME1)	\
-	CLIENT_MESSAGE_HANDLER_ARGS1(NAME, ARG_TYPE1, ARG_NAME1)					\
-	NETWORK_MESSAGE_DECLARE_ARGS1(Client, NAME,									\
-				NAME##ClientMessagehandler1, MSG_LENGTH, ARG_TYPE1, ARG_NAME1)	\
-																				\
 
 /**
 	Client消息宏，  只有三个参数的消息

@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #include "rsa.h"
 #include "common.h"
@@ -88,7 +70,7 @@ bool KBE_RSA::loadPublic(const std::string& keyname)
 			ERR_load_crypto_strings();
 			char err[1024];
 			char* errret = ERR_error_string(ERR_get_error(), err);
-			ERROR_MSG(fmt::format("KBE_RSA::loadPublic: PEM_read_RSAPublicKey is error.({} : {})\n",
+			ERROR_MSG(fmt::format("KBE_RSA::loadPublic: PEM_read_RSAPublicKey error({} : {})\n",
 				errret, err));
 
 			fclose(fp);
@@ -119,7 +101,7 @@ bool KBE_RSA::loadPrivate(const std::string& keyname)
 			ERR_load_crypto_strings();
 			char err[1024];
 			char* errret = ERR_error_string(ERR_get_error(), err);
-			ERROR_MSG(fmt::format("KBE_RSA::loadPrivate: PEM_read_RSAPrivateKey is error.({} : {})\n",
+			ERROR_MSG(fmt::format("KBE_RSA::loadPrivate: PEM_read_RSAPrivateKey error({} : {})\n",
 				errret, err));
 
 			fclose(fp);
@@ -146,7 +128,7 @@ bool KBE_RSA::generateKey(const std::string& pubkeyname,
 		ERR_load_crypto_strings();
 		char err[1024];
 		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::generateKey: RSA_generate_key is error.({} : {})\n",
+		ERROR_MSG(fmt::format("KBE_RSA::generateKey: RSA_generate_key error({} : {})\n",
 			errret, err));
 
 		return false;
@@ -170,7 +152,7 @@ bool KBE_RSA::generateKey(const std::string& pubkeyname,
 		ERR_load_crypto_strings();
 		char err[1024];
 		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::generateKey: PEM_write_RSAPrivateKey is error.({} : {})\n",
+		ERROR_MSG(fmt::format("KBE_RSA::generateKey: PEM_write_RSAPrivateKey error({} : {})\n",
 			errret, err));
 
 		fclose(fp);
@@ -190,7 +172,7 @@ bool KBE_RSA::generateKey(const std::string& pubkeyname,
 		ERR_load_crypto_strings();
 		char err[1024];
 		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::generateKey: PEM_write_RSAPublicKey is error.({} : {})\n",
+		ERROR_MSG(fmt::format("KBE_RSA::generateKey: PEM_write_RSAPublicKey error({} : {})\n",
 			errret, err));
 
 		fclose(fp);
@@ -234,7 +216,7 @@ int KBE_RSA::encrypt(const std::string& instr, std::string& outCertifdata)
 		ERR_load_crypto_strings();
 		char err[1024];
 		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::encrypt: RSA_public_encrypt is error.({} : {})\n",
+		ERROR_MSG(fmt::format("KBE_RSA::encrypt: RSA_public_encrypt error({} : {})\n",
 			errret, err));
 
 		free(certifdata);
@@ -277,7 +259,7 @@ int KBE_RSA::decrypt(const std::string& inCertifdata, std::string& outstr)
 		ERR_load_crypto_strings();
 		char err[1024];
 		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::decrypt: RSA_private_decrypt is error.({} : {})\n",
+		ERROR_MSG(fmt::format("KBE_RSA::decrypt: RSA_private_decrypt error({} : {})\n",
 			errret, err));
 
 		free(keydata);

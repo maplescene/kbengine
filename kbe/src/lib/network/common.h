@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #ifndef KBE_NETWORK_COMMON_H
 #define KBE_NETWORK_COMMON_H
@@ -57,6 +39,26 @@ extern int8 g_channelExternalEncryptType;
 
 // listen监听队列最大值
 extern uint32 g_SOMAXCONN;
+
+// udp握手包
+extern const char* UDP_HELLO;
+extern const char* UDP_HELLO_ACK;
+
+// UDP参数
+extern uint32 g_rudp_intWritePacketsQueueSize;
+extern uint32 g_rudp_intReadPacketsQueueSize;
+extern uint32 g_rudp_extWritePacketsQueueSize;
+extern uint32 g_rudp_extReadPacketsQueueSize;
+extern uint32 g_rudp_tickInterval;
+extern uint32 g_rudp_minRTO;
+extern uint32 g_rudp_mtu;
+extern uint32 g_rudp_missAcksResend;
+extern bool g_rudp_congestionControl;
+extern bool g_rudp_nodelay;
+
+// Certificate file required for HTTPS/WSS/SSL communication
+extern std::string g_sslCertificate;
+extern std::string g_sslPrivateKey;
 
 // 不做通道超时检查
 #define CLOSE_CHANNEL_INACTIVITIY_DETECTION()										\
@@ -124,6 +126,13 @@ enum ProtocolType
 {
 	PROTOCOL_TCP = 0,
 	PROTOCOL_UDP = 1,
+};
+
+enum ProtocolSubType
+{
+	SUB_PROTOCOL_DEFAULT = 0,
+	SUB_PROTOCOL_UDP = 1,
+	SUB_PROTOCOL_KCP = 2,
 };
 
 enum Reason
@@ -302,9 +311,9 @@ const char * reasonToString(Reason reason)
 #define MALLOC_PACKET(outputPacket, isTCPPacket)															\
 {																											\
 	if(isTCPPacket)																							\
-		outputPacket = TCPPacket::createPoolObject();														\
+		outputPacket = TCPPacket::createPoolObject(OBJECTPOOL_POINT);										\
 	else																									\
-		outputPacket = UDPPacket::createPoolObject();														\
+		outputPacket = UDPPacket::createPoolObject(OBJECTPOOL_POINT);										\
 }																											\
 
 
@@ -318,11 +327,23 @@ const char * reasonToString(Reason reason)
 
 
 // 配合服务端配置选项trace_packet使用，用来跟踪一条即将输出的消息包
-#define TRACE_MESSAGE_PACKET(isrecv, pPacket, pCurrMsgHandler, length, addr)								\
+#define TRACE_MESSAGE_PACKET(isrecv, pPacket, pCurrMsgHandler, length, addr, readPacketHead)				\
 	if(Network::g_trace_packet > 0)																			\
 	{																										\
 		if(Network::g_trace_packet_use_logfile)																\
 			DebugHelper::getSingleton().changeLogger("packetlogs");											\
+																											\
+		size_t headsize = 0;																				\
+		if(pCurrMsgHandler && readPacketHead)																\
+		{																									\
+			headsize = NETWORK_MESSAGE_ID_SIZE;																\
+			if (pCurrMsgHandler->msgLen == NETWORK_VARIABLE_MESSAGE)										\
+			{																								\
+				headsize += NETWORK_MESSAGE_LENGTH_SIZE;													\
+				if (length >= NETWORK_MESSAGE_MAX_SIZE)														\
+					headsize += NETWORK_MESSAGE_LENGTH1_SIZE;												\
+			}																								\
+		}																									\
 																											\
 		bool isprint = true;																				\
 		if(pCurrMsgHandler)																					\
@@ -341,13 +362,18 @@ const char * reasonToString(Reason reason)
 						((isrecv == true) ? "====>" : "<===="),												\
 						pCurrMsgHandler->name.c_str(),														\
 						pCurrMsgHandler->msgID,																\
-						length,																				\
+						(length + headsize),																\
 						addr));																				\
 			}																								\
 		}																									\
 																											\
 		if(isprint)																							\
 		{																									\
+																											\
+			size_t rpos = pPacket->rpos();																	\
+			if(headsize > 0)																				\
+				pPacket->rpos(pPacket->rpos() - headsize);													\
+																											\
 			switch(Network::g_trace_packet)																	\
 			{																								\
 			case 1:																							\
@@ -360,6 +386,8 @@ const char * reasonToString(Reason reason)
 				pPacket->print_storage();																	\
 				break;																						\
 			};																								\
+																											\
+			pPacket->rpos(rpos);																			\
 		}																									\
 																											\
 		if(Network::g_trace_packet_use_logfile)																\
@@ -387,8 +415,11 @@ extern uint32						g_intSendWindowMessagesOverflow;
 extern uint32						g_extSendWindowMessagesOverflow;
 extern uint32						g_intSendWindowBytesOverflow;
 extern uint32						g_extSendWindowBytesOverflow;
+extern uint32						g_intSentWindowBytesOverflow;
+extern uint32						g_extSentWindowBytesOverflow;
 
 bool initializeWatcher();
+bool initialize();
 void finalise(void);
 
 }

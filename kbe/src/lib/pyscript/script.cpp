@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 
 #include "script.h"
@@ -26,7 +8,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "copy.h"
 #include "pystruct.h"
 #include "py_gc.h"
-#include "install_py_dlls.h"
+#include "pyurl.h"
 #include "resmgr/resmgr.h"
 #include "thread/concurrency.h"
 
@@ -193,6 +175,7 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
         return false;
     } 
 
+	PySys_SetArgvEx(0, NULL, 0);
 	PyObject *m = PyImport_AddModule("__main__");
 
 	// 添加一个脚本基础模块
@@ -211,16 +194,11 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 	// 注册产生uuid方法到py
 	APPEND_SCRIPT_MODULE_METHOD(module_,		genUUID64,			__py_genUUID64,					METH_VARARGS,			0);
 
-	if(!install_py_dlls())
-	{
-		ERROR_MSG("Script::install(): install_py_dlls() is failed!\n");
-		return false;
-	}
-
 	// 安装py重定向模块
 	ScriptStdOut::installScript(NULL);
 	ScriptStdErr::installScript(NULL);
 
+	/*
 	static struct PyModuleDef moduleDesc =
 	{  
 			 PyModuleDef_HEAD_INIT,  
@@ -232,9 +210,11 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 
 	// 初始化基础模块
 	PyModule_Create(&moduleDesc);
+	*/
 
 	// 将模块对象加入main
 	PyObject_SetAttrString(m, moduleName, module_);	
+	PyObject_SetAttrString(module_, "__doc__", PyUnicode_FromString("This module is created by KBEngine!"));
 
 	// 重定向python输出
 	pyStdouterr_ = new ScriptStdOutErr();
@@ -252,6 +232,7 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 	PyProfile::initialize(this);
 	PyStruct::initialize();
 	Copy::initialize();
+	PyUrl::initialize(this);
 	SCRIPT_ERROR_CHECK();
 
 	math::installModule("Math");
@@ -267,6 +248,7 @@ bool Script::uninstall()
 	PyProfile::finalise();
 	PyStruct::finalise();
 	Copy::finalise();
+	PyUrl::finalise();
 	SCRIPT_ERROR_CHECK();
 
 	if(pyStdouterr_)
@@ -280,12 +262,6 @@ bool Script::uninstall()
 
 	ScriptStdOut::uninstallScript();
 	ScriptStdErr::uninstallScript();
-
-	if(!uninstall_py_dlls())
-	{
-		ERROR_MSG("Script::uninstall(): uninstall_py_dlls() is failed!\n");
-		return false;
-	}
 
 	PyGC::initialize();
 
@@ -304,11 +280,6 @@ bool Script::installExtraModule(const char* moduleName)
 	// 添加一个脚本扩展模块
 	extraModule_ = PyImport_AddModule(moduleName);
 	if (extraModule_ == NULL)
-		return false;
-	
-	// 初始化扩展模块
-	PyObject *module_ = PyImport_AddModule(moduleName);
-	if (module_ == NULL)
 		return false;
 
 	// 将扩展模块对象加入main
@@ -375,7 +346,7 @@ void Script::setenv(const std::string& name, const std::string& value)
 
 		if (!py_environ)
 		{
-			ERROR_MSG("Script::setenv: get os.environ is error!\n");
+			ERROR_MSG("Script::setenv: get os.environ error!\n");
 			PyErr_PrintEx(0);
 			Py_DECREF(py_value);
 			Py_DECREF(py_name);
@@ -402,7 +373,7 @@ void Script::setenv(const std::string& name, const std::string& value)
 		
 		if(ret == -1)
 		{
-			ERROR_MSG("Script::setenv: get os.environ is error!\n");
+			ERROR_MSG("Script::setenv: get os.environ error!\n");
 			PyErr_PrintEx(0);
 			return;
 		}

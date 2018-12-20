@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 
 #ifndef KBE_MATH_H
@@ -110,7 +92,7 @@ typedef G3D::Vector3							Vector3;
 typedef G3D::Vector4							Vector4;
 
 #define KBE_PI									3.1415926535898
-#define KBE_2PI									KBE_PI * 2
+#define KBE_2PI									6.2831853071796
 #define KBE_DegreeToRadian						G3D::toRadians
 #define KBE_RadianToDegree						G3D::toRadians
 	
@@ -194,6 +176,13 @@ struct Direction3D																										// 表示方向位置变量类型
 	Direction3D():dir(0.f, 0.f, 0.f) {};
 	Direction3D(const Vector3 & v):dir(v){}
 	Direction3D(float r, float p, float y):dir(r, p, y){}
+	Direction3D(const Direction3D & v) :dir(v.dir){}
+
+	Direction3D& operator=(const Direction3D& v)
+	{
+		dir = v.dir;
+		return *this;
+	}
 
 	float roll() const{ return dir.x; }		
 	float pitch() const{ return dir.y; }		

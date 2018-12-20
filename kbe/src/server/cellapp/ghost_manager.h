@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #ifndef KBE_GHOST_MANAGER_HANDLER_H
 #define KBE_GHOST_MANAGER_HANDLER_H
@@ -54,6 +36,12 @@ public:
 
 	COMPONENT_ID getRoute(ENTITY_ID entityID);
 	void addRoute(ENTITY_ID entityID, COMPONENT_ID componentID);
+
+	/**
+	创建发送bundle，该bundle可能是从send放入发送队列中获取的，如果队列为空
+	则创建一个新的
+	*/
+	Network::Bundle* createSendBundle(COMPONENT_ID componentID);
 
 private:
 	virtual void handleTimeout(TimerHandle handle, void * pUser);

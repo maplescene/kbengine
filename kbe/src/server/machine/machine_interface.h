@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 
 #if defined(DEFINE_IN_INTERFACE)
@@ -47,7 +29,7 @@ namespace KBEngine{
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(MachineInterface)
 	// 其他组件向app广播自己的接口地址
-	MACHINE_MESSAGE_DECLARE_ARGS24(onBroadcastInterface,			NETWORK_VARIABLE_MESSAGE,
+	MACHINE_MESSAGE_DECLARE_ARGS25(onBroadcastInterface,			NETWORK_VARIABLE_MESSAGE,
 									int32,							uid, 
 									std::string,					username,
 									COMPONENT_TYPE,					componentType, 
@@ -55,6 +37,7 @@ NETWORK_INTERFACE_DECLARE_BEGIN(MachineInterface)
 									COMPONENT_ID,					componentIDEx, 
 									COMPONENT_ORDER,				globalorderid, 
 									COMPONENT_ORDER,				grouporderid, 
+									COMPONENT_GUS,					gus,
 									uint32,							intaddr, 
 									uint16,							intport,
 									uint32,							extaddr, 
@@ -105,6 +88,9 @@ NETWORK_INTERFACE_DECLARE_BEGIN(MachineInterface)
 
 	// 关闭服务器
 	MACHINE_MESSAGE_DECLARE_STREAM(stopserver,						NETWORK_VARIABLE_MESSAGE)
+
+	// 关闭服务器
+	MACHINE_MESSAGE_DECLARE_STREAM(killserver,						NETWORK_VARIABLE_MESSAGE)
 
 	// 请求强制杀死当前app
 	MACHINE_MESSAGE_DECLARE_STREAM(reqKillServer,					NETWORK_VARIABLE_MESSAGE)

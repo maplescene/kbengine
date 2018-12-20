@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 
 namespace KBEngine{
@@ -34,35 +16,33 @@ INLINE void Witness::pEntity(Entity* pEntity)
 }
 
 //-------------------------------------------------------------------------------------
-INLINE float Witness::aoiRadius() const
+INLINE float Witness::viewRadius() const
 { 
-	return aoiRadius_; 
+	return viewRadius_; 
 }
 
 //-------------------------------------------------------------------------------------
-INLINE float Witness::aoiHysteresisArea() const
+INLINE float Witness::viewHysteresisArea() const
 { 
-	return aoiHysteresisArea_; 
+	return viewHysteresisArea_; 
 }
 
 //-------------------------------------------------------------------------------------
-INLINE EntityRef* Witness::getAOIEntityRef(ENTITY_ID entityID)
+INLINE EntityRef* Witness::getViewEntityRef(ENTITY_ID entityID)
 {
-	EntityRef::AOI_ENTITIES::iterator iter = std::find_if(aoiEntities_.begin(), aoiEntities_.end(), 
-		findif_vector_entityref_exist_by_entityid_handler(entityID));
-
-	if(iter != aoiEntities_.end())
+	VIEW_ENTITIES_MAP::iterator iter = viewEntities_map_.find(entityID);
+	if(iter != viewEntities_map_.end())
 	{
-		return (*iter);
+		return iter->second;
 	}
 	
 	return NULL;
 }
 
 //-------------------------------------------------------------------------------------
-INLINE bool Witness::entityInAOI(ENTITY_ID entityID)
+INLINE bool Witness::entityInView(ENTITY_ID entityID)
 {
-	EntityRef* pEntityRef = getAOIEntityRef(entityID);
+	EntityRef* pEntityRef = getViewEntityRef(entityID);
 
 	if(pEntityRef == NULL || pEntityRef->pEntity() == NULL || pEntityRef->flags() == ENTITYREF_FLAG_UNKONWN || 
 		(pEntityRef->flags() & (ENTITYREF_FLAG_ENTER_CLIENT_PENDING | ENTITYREF_FLAG_LEAVE_CLIENT_PENDING)) > 0)
@@ -72,21 +52,27 @@ INLINE bool Witness::entityInAOI(ENTITY_ID entityID)
 }
 
 //-------------------------------------------------------------------------------------
-INLINE AOITrigger* Witness::pAOITrigger()
+INLINE ViewTrigger* Witness::pViewTrigger()
 {
-	return pAOITrigger_;
+	return pViewTrigger_;
 }
 
 //-------------------------------------------------------------------------------------
-INLINE AOITrigger* Witness::pAOIHysteresisAreaTrigger()
+INLINE ViewTrigger* Witness::pViewHysteresisAreaTrigger()
 {
-	return pAOIHysteresisAreaTrigger_;
+	return pViewHysteresisAreaTrigger_;
 }
 
 //-------------------------------------------------------------------------------------
-INLINE EntityRef::AOI_ENTITIES& Witness::aoiEntities()
+INLINE Witness::VIEW_ENTITIES_MAP& Witness::viewEntitiesMap()
 { 
-	return aoiEntities_; 
+	return viewEntities_map_; 
+}
+
+//-------------------------------------------------------------------------------------
+INLINE Witness::VIEW_ENTITIES& Witness::viewEntities()
+{
+	return viewEntities_;
 }
 
 //-------------------------------------------------------------------------------------

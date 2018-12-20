@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #include "fixeddict.h"
 #include "datatypes.h"
@@ -62,62 +44,32 @@ SCRIPT_MEMBER_DECLARE_END()
 
 SCRIPT_GETSET_DECLARE_BEGIN(FixedDict)
 SCRIPT_GETSET_DECLARE_END()
-SCRIPT_INIT(FixedDict, 0, &FixedDict::mappingSequenceMethods, &FixedDict::mappingMethods, 0, 0)	
+SCRIPT_INIT(FixedDict, 0, &FixedDict::mappingSequenceMethods, &FixedDict::mappingMethods, &Map::mp_keyiter, &Map::mp_iternextkey)
 	
-//-------------------------------------------------------------------------------------
-FixedDict::FixedDict(DataType* dataType, std::string& strDictInitData):
-Map(getScriptType(), false)
-{
-	_dataType = static_cast<FixedDictType*>(dataType);
-	_dataType->incRef();
-	initialize(strDictInitData);
-
-	script::PyGC::incTracing("FixedDict");
-
-//	DEBUG_MSG(fmt::format("FixedDict::FixedDict(1): {:p}---{}\n", (void*)this,
-//		wchar2char(PyUnicode_AsWideCharString(PyObject_Str(getDictObject()), NULL))));
-}
-
-//-------------------------------------------------------------------------------------
-FixedDict::FixedDict(DataType* dataType, PyObject* pyDictInitData):
-Map(getScriptType(), false)
-{
-	_dataType = static_cast<FixedDictType*>(dataType);
-	_dataType->incRef();
-	initialize(pyDictInitData);
-
-	script::PyGC::incTracing("FixedDict");
-
-//	DEBUG_MSG(fmt::format("FixedDict::FixedDict(2): {:p}---{}\n", (void*)this,
-//		wchar2char(PyUnicode_AsWideCharString(PyObject_Str(getDictObject()), NULL))));
-}
-
-//-------------------------------------------------------------------------------------
-FixedDict::FixedDict(DataType* dataType, MemoryStream* streamInitData, bool isPersistentsStream):
-Map(getScriptType(), false)
-{
-	_dataType = static_cast<FixedDictType*>(dataType);
-	_dataType->incRef();
-	initialize(streamInitData, isPersistentsStream);
-	
-	script::PyGC::incTracing("FixedDict");
-
-//	DEBUG_MSG(fmt::format("FixedDict::FixedDict(3): {:p}---{}\n", (void*)this,
-//		wchar2char(PyUnicode_AsWideCharString(PyObject_Str(getDictObject()), NULL))));
-}
-
 //-------------------------------------------------------------------------------------
 FixedDict::FixedDict(DataType* dataType):
 Map(getScriptType(), false)
 {
 	_dataType = static_cast<FixedDictType*>(dataType);
 	_dataType->incRef();
-	initialize("");
 
 	script::PyGC::incTracing("FixedDict");
 
-//	DEBUG_MSG(fmt::format("FixedDict::FixedDict(4): {:p}---{}\n", (void*)this,
-//		wchar2char(PyUnicode_AsWideCharString(PyObject_Str(getDictObject()), NULL))));
+	//	DEBUG_MSG(fmt::format("FixedDict::FixedDict(1): {:p}---{}\n", (void*)this,
+	//		PyUnicode_AsUTF8AndSize(PyObject_Str(getDictObject()), NULL)));
+}
+
+//-------------------------------------------------------------------------------------
+FixedDict::FixedDict(DataType* dataType, bool isPersistentsStream):
+Map(getScriptType(), false)
+{
+	_dataType = static_cast<FixedDictType*>(dataType);
+	_dataType->incRef();
+	
+	script::PyGC::incTracing("FixedDict");
+
+	//	DEBUG_MSG(fmt::format("FixedDict::FixedDict(2): {:p}---{}\n", (void*)this,
+	//		PyUnicode_AsUTF8AndSize(PyObject_Str(getDictObject()), NULL)));
 }
 
 
@@ -127,30 +79,66 @@ FixedDict::~FixedDict()
 	_dataType->decRef();
 	script::PyGC::decTracing("FixedDict");
 
-//	DEBUG_MSG(fmt::format("FixedDict::~FixedDict(): {:p}\n", (void*)this);
+//	DEBUG_MSG(fmt::format("FixedDict::~FixedDict(): {:p}\n", (void*)this));
 }
 
 //-------------------------------------------------------------------------------------
 void FixedDict::initialize(std::string strDictInitData)
 {
-	FixedDictType::FIXEDDICT_KEYTYPE_MAP& keyTypes = _dataType->getKeyTypes();
-	FixedDictType::FIXEDDICT_KEYTYPE_MAP::iterator iter = keyTypes.begin();
-	for(; iter != keyTypes.end(); ++iter)
+	PyObject* pyVal = NULL;
+
+	if (strDictInitData.size() > 0)
 	{
-		PyObject* pyobj = iter->second->dataType->parseDefaultStr("");
-		if(pyobj)
+		PyObject* module = PyImport_AddModule("__main__");
+		if (module == NULL)
 		{
-			PyObject* pykey = PyUnicode_FromString(iter->first.c_str());
-			PyDict_SetItem(pyDict_, pykey, pyobj);
-			Py_DECREF(pykey);
-			Py_DECREF(pyobj);
+			PyErr_SetString(PyExc_SystemError,
+				"FixedDictType::createObject:PyImport_AddModule __main__ error!");
+
+			PyErr_PrintEx(0);
+			goto _StartCreateFixedDict;
+		}
+
+		PyObject* mdict = PyModule_GetDict(module); // Borrowed reference.
+
+		pyVal = PyRun_String(const_cast<char*>(strDictInitData.c_str()),
+			Py_eval_input, mdict, mdict);
+
+		if (pyVal == NULL)
+		{
+			SCRIPT_ERROR_CHECK();
+			ERROR_MSG(fmt::format("FIXED_DICT({}) initialize({}) error!\n",
+				_dataType->aliasName(), strDictInitData));
 		}
 		else
 		{
-			ERROR_MSG(fmt::format("FixedDict::initialize: error! strDictInitData={}.\n",
-				strDictInitData.c_str()));
+			if (!isSameType(pyVal))
+			{
+				ERROR_MSG(fmt::format("FIXED_DICT({}) initialize({}) error! is not same type, allKeyNames=[{}]\n",
+					_dataType->aliasName(), strDictInitData, _dataType->debugInfos().c_str()));
+				Py_DECREF(pyVal);
+				pyVal = NULL;
+			}
 		}
 	}
+
+_StartCreateFixedDict:
+	if (!pyVal)
+	{
+		pyVal = PyDict_New();
+
+		FixedDictType::FIXEDDICT_KEYTYPE_MAP& keyTypes = _dataType->getKeyTypes();
+		FixedDictType::FIXEDDICT_KEYTYPE_MAP::iterator iter = keyTypes.begin();
+		for (; iter != keyTypes.end(); ++iter)
+		{
+			PyObject* item = iter->second->dataType->parseDefaultStr("");
+			PyDict_SetItemString(pyVal, iter->first.c_str(), item);
+			Py_DECREF(item);
+		}
+	}
+
+	initialize(pyVal);
+	Py_DECREF(pyVal);
 }
 
 //-------------------------------------------------------------------------------------
@@ -188,6 +176,13 @@ void FixedDict::initialize(MemoryStream* streamInitData, bool isPersistentsStrea
 			else
 				val1 = iter->second->dataType->createFromStream(streamInitData);
 
+			if (!val1)
+			{
+				ERROR_MSG(fmt::format("FixedDict::initialize: key({}) createFromStream error, use default value! type={}\n", iter->first, this->getDataType()->aliasName()));
+				val1 = iter->second->dataType->parseDefaultStr("");
+				KBE_ASSERT(val1);
+			}
+
 			PyDict_SetItemString(pyDict_, iter->first.c_str(), val1);
 			
 			// 由于PyDict_SetItem会增加引用因此需要减
@@ -222,9 +217,9 @@ PyObject* FixedDict::__py_reduce_ex__(PyObject* self, PyObject* protocol)
 PyObject* FixedDict::__unpickle__(PyObject* self, PyObject* args)
 {
 	Py_ssize_t size = PyTuple_Size(args);
-	if(size != 2)
+	if (size != 2)
 	{
-		ERROR_MSG("FixedDict::__unpickle__: args is wrong! (size != 2)");
+		ERROR_MSG("FixedDict::__unpickle__: args is wrong! (size != 2)\n");
 		S_Return;
 	}
 
@@ -232,13 +227,28 @@ PyObject* FixedDict::__unpickle__(PyObject* self, PyObject* args)
 	DATATYPE_UID uid = (DATATYPE_UID)PyLong_AsUnsignedLong(pyDatatypeUID);
 
 	PyObject* dict = PyTuple_GET_ITEM(args, 1);
-	if(dict == NULL)
+	if (dict == NULL)
 	{
-		ERROR_MSG("FixedDict::__unpickle__: args is wrong!");
+		ERROR_MSG("FixedDict::__unpickle__: args is wrong!\n");
 		S_Return;
 	}
-	
-	return new FixedDict(DataTypes::getDataType(uid), dict);
+
+	DataType* pDataType = DataTypes::getDataType(uid);
+	if (!pDataType)
+	{
+		ERROR_MSG(fmt::format("FixedDict::__unpickle__: not found datatype(uid={})!\n", uid));
+		S_Return;
+	}
+
+	if (pDataType->type() != DATA_TYPE_FIXEDDICT)
+	{
+		ERROR_MSG(fmt::format("FixedDict::__unpickle__: datatype(uid={}) is not FixedDict! dataTypeName={}\n", uid, pDataType->getName()));
+		S_Return;
+	}
+
+	FixedDict* pFixedDict = new FixedDict(pDataType);
+	pFixedDict->initialize(dict);
+	return pFixedDict;
 }
 
 //-------------------------------------------------------------------------------------
@@ -261,16 +271,21 @@ int FixedDict::mp_length(PyObject* self)
 //-------------------------------------------------------------------------------------
 int FixedDict::mp_ass_subscript(PyObject* self, PyObject* key, PyObject* value)
 {
-	wchar_t* PyUnicode_AsWideCharStringRet0 = PyUnicode_AsWideCharString(key, NULL);
-	char* dictKeyName = strutil::wchar2char(PyUnicode_AsWideCharStringRet0);
-	PyMem_Free(PyUnicode_AsWideCharStringRet0);
+	const char* dictKeyName = PyUnicode_AsUTF8AndSize(key, NULL);
+	if (dictKeyName == NULL)
+	{
+		char err[255];
+		kbe_snprintf(err, 255, "FixedDict::mp_ass_subscript: key not is string!\n");
+		PyErr_SetString(PyExc_TypeError, err);
+		PyErr_PrintEx(0);
+		return 0;
+	}
 
 	FixedDict* fixedDict = static_cast<FixedDict*>(self);
 	if (value == NULL)
 	{
 		if(!fixedDict->checkDataChanged(dictKeyName, value, true))
 		{
-			free(dictKeyName);
 			return 0;
 		}
 
@@ -279,7 +294,6 @@ int FixedDict::mp_ass_subscript(PyObject* self, PyObject* key, PyObject* value)
 	
 	if(!fixedDict->checkDataChanged(dictKeyName, value))
 	{
-		free(dictKeyName);
 		return 0;
 	}
 
@@ -291,7 +305,6 @@ int FixedDict::mp_ass_subscript(PyObject* self, PyObject* key, PyObject* value)
 	// 由于PyDict_SetItem会增加引用因此需要减
 	Py_DECREF(val1);
 
-	free(dictKeyName);
 	return ret;
 }
 
@@ -374,6 +387,11 @@ PyObject* FixedDict::update(PyObject* args)
 PyObject* FixedDict::tp_str()
 {
 	return tp_repr();
+}
+
+bool FixedDict::isSameType(PyObject* pyValue)
+{
+	return _dataType->isSameType(pyValue);
 }
 
 //-------------------------------------------------------------------------------------

@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #include "sys_info.h"
 
@@ -28,6 +10,15 @@ extern "C"
 
 #ifndef CODE_INLINE
 #include "sys_info.inl"
+#endif
+
+#if KBE_PLATFORM == PLATFORM_WIN32
+#include <Iphlpapi.h>
+#pragma comment (lib,"iphlpapi.lib") 
+#else
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <arpa/inet.h>
 #endif
 
 namespace KBEngine
@@ -47,8 +38,16 @@ bool hasPID(int pid, sigar_proc_list_t* proclist)
 	for (size_t i = 0; i < proclist->number; i++)
 	{
 		sigar_pid_t cpid = proclist->data[i];
-		if(cpid == pid)
+		if (cpid == pid)
+		{
+			sigar_proc_state_t procstate;
+			if (sigar_proc_state_get(_g_sigarproclist, pid, &procstate) != SIGAR_OK)
+			{
+				return false;
+			}
+
 			return true;
+		}
 	}
 
 	return false;
@@ -58,9 +57,11 @@ bool hasPID(int pid, sigar_proc_list_t* proclist)
 SystemInfo::SystemInfo()
 {
 	totalmem_ = 0;
-	_autocreate();
-	// getCPUPer();
-	// getProcessInfo();
+
+	// 不要在初始化中做这件事情，因为全局静态变量这里可能在main之前被调用一次
+	//_autocreate();
+	//getCPUPer();
+	//getProcessInfo();
 }
 
 //-------------------------------------------------------------------------------------
@@ -96,7 +97,7 @@ bool SystemInfo::_autocreate()
 		int status = sigar_proc_list_get(_g_sigarproclist, &_g_proclist);
 		if (status != SIGAR_OK) 
 		{
-			DEBUG_MSG(fmt::format("SystemInfo::autocreate:error: {} ({}) sigar_proc_list_get\n",
+			DEBUG_MSG(fmt::format("SystemInfo::autocreate: error: {} ({}) sigar_proc_list_get\n",
 					   status, sigar_strerror(_g_sigarproclist, status)));
 
 			sigar_close(_g_sigarproclist);
@@ -111,8 +112,6 @@ bool SystemInfo::_autocreate()
 //-------------------------------------------------------------------------------------
 bool SystemInfo::hasProcess(uint32 pid)
 {
-	clear();
-
     if(!_autocreate())
 		return false;
 
@@ -161,8 +160,6 @@ uint32 SystemInfo::countCPU()
 //-------------------------------------------------------------------------------------
 SystemInfo::PROCESS_INFOS SystemInfo::getProcessInfo(uint32 pid)
 {
-	clear();
-
 	PROCESS_INFOS infos;
 	infos.cpu = 0.f;
 	infos.memused = 0;
@@ -176,7 +173,7 @@ SystemInfo::PROCESS_INFOS SystemInfo::getProcessInfo(uint32 pid)
 _TRYGET:
 	if(!hasPID(pid, &_g_proclist))
 	{
-		DEBUG_MSG(fmt::format("SystemInfo::getProcessInfo: error: not found pid({})\n", pid));
+		//DEBUG_MSG(fmt::format("SystemInfo::getProcessInfo: error: not found pid({})\n", pid));
 		
 		if(!tryed)
 		{
@@ -185,11 +182,22 @@ _TRYGET:
 			tryed = true;
 			infos.error = true;
 
+			//DEBUG_MSG(fmt::format("SystemInfo::getProcessInfo: try to find the pid({})\n", pid));
+
 			if(_autocreate())
 				goto _TRYGET;
 		}
 
 		goto _END;
+	}
+	else
+	{
+		if (tryed)
+		{
+			//DEBUG_MSG(fmt::format("SystemInfo::getProcessInfo: found pid({})\n", pid));
+		}
+
+		infos.error = false;
 	}
 
 	infos.cpu = getCPUPerByPID(pid);
@@ -242,7 +250,7 @@ float SystemInfo::getCPUPerByPID(uint32 pid)
 _TRYGET:
 	if(!hasPID(pid, &_g_proclist))
 	{
-		DEBUG_MSG(fmt::format("SystemInfo::getCPUPerByPID: error: not found pid({})\n", pid));
+		//DEBUG_MSG(fmt::format("SystemInfo::getCPUPerByPID: error: not found pid({})\n", pid));
 
 		if(!tryed)
 		{
@@ -353,7 +361,7 @@ uint64 SystemInfo::getMemUsedByPID(uint32 pid)
 _TRYGET:
 	if(!hasPID(pid, &_g_proclist))
 	{
-		DEBUG_MSG(fmt::format("SystemInfo::getMemUsedByPID: error: not found pid({})\n", pid));
+		//DEBUG_MSG(fmt::format("SystemInfo::getMemUsedByPID: error: not found pid({})\n", pid));
 
 		if(!tryed)
 		{
@@ -375,7 +383,7 @@ _TRYGET:
         status = sigar_proc_state_get(_g_sigarproclist, pid, &pstate);
         if (status != SIGAR_OK) 
 		{
-            DEBUG_MSG(fmt::format("error: {} ({}) proc_state({})\n",
+			DEBUG_MSG(fmt::format("error: {} ({}) proc_state({})\n",
                    status, sigar_strerror(_g_sigarproclist, status), pid));
 			
 			goto _END;
@@ -384,7 +392,7 @@ _TRYGET:
         status = sigar_proc_time_get(_g_sigarproclist, pid, &ptime);
         if (status != SIGAR_OK) 
 		{
-            DEBUG_MSG(fmt::format("error: {} ({}) proc_time({})\n",
+			DEBUG_MSG(fmt::format("error: {} ({}) proc_time({})\n",
                    status, sigar_strerror(_g_sigarproclist, status), pid));
 
            goto _END;
@@ -395,7 +403,7 @@ _TRYGET:
 
         if (status != SIGAR_OK) 
 		{
-            DEBUG_MSG(fmt::format("error: {} ({}) sigar_proc_mem_get({})\n",
+			DEBUG_MSG(fmt::format("error: {} ({}) sigar_proc_mem_get({})\n",
                    status, sigar_strerror(_g_sigarproclist, status), pid));
             
 			goto _END;
@@ -407,6 +415,100 @@ _TRYGET:
 _END:
 	return total;
 }
+
+//-------------------------------------------------------------------------------------
+std::vector< std::string > SystemInfo::getMacAddresses()
+{
+	std::vector< std::string > mac_addresses;
+
+#if KBE_PLATFORM == PLATFORM_WIN32
+	PIP_ADAPTER_INFO pIpAdapterInfo = new IP_ADAPTER_INFO();
+	unsigned long size = sizeof(IP_ADAPTER_INFO);
+
+	int ret_info = ::GetAdaptersInfo(pIpAdapterInfo, &size);
+
+	if (ERROR_BUFFER_OVERFLOW == ret_info)
+	{
+		delete pIpAdapterInfo;
+		pIpAdapterInfo = (PIP_ADAPTER_INFO)new unsigned char[size];
+		ret_info = ::GetAdaptersInfo(pIpAdapterInfo, &size);
+	}
+
+	if (ERROR_SUCCESS == ret_info)
+	{
+		PIP_ADAPTER_INFO _pIpAdapterInfo = pIpAdapterInfo;
+		while (_pIpAdapterInfo)
+		{
+			char MAC_BUF[256];
+			std::string MAC;
+
+			for (UINT i = 0; i < _pIpAdapterInfo->AddressLength; i++)
+			{
+				sprintf(MAC_BUF, "%02x", _pIpAdapterInfo->Address[i]);
+				MAC += MAC_BUF;
+			}
+
+			std::transform(MAC.begin(), MAC.end(), MAC.begin(), tolower);
+			mac_addresses.push_back(MAC);
+			_pIpAdapterInfo = _pIpAdapterInfo->Next;
+		}
+	}
+
+	if (pIpAdapterInfo)
+	{
+		delete pIpAdapterInfo;
+	}
+
+#else
+
+	int fd;
+	int interfaceNum = 0;
+	struct ifreq buf[16];
+	struct ifconf ifc;
+
+	if ((fd = ::socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+	{
+		::close(fd);
+		return mac_addresses;
+	}
+
+	ifc.ifc_len = sizeof(buf);
+	ifc.ifc_buf = (caddr_t)buf;
+
+	if (!ioctl(fd, SIOCGIFCONF, (char *)&ifc))
+	{
+		interfaceNum = ifc.ifc_len / sizeof(struct ifreq);
+		while (interfaceNum-- > 0)
+		{
+			if (!ioctl(fd, SIOCGIFHWADDR, (char *)(&buf[interfaceNum])))
+			{
+				char MAC[19];
+				memset(&MAC[0], 0, sizeof(MAC));
+
+				sprintf(MAC, "%02x:%02x:%02x:%02x:%02x:%02x",
+					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[0],
+					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[1],
+					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[2],
+					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[3],
+					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[4],
+					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[5]);
+
+				mac_addresses.push_back(MAC);
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+
+	::close(fd);
+
+#endif
+
+	return mac_addresses;
+}
+
 
 //-------------------------------------------------------------------------------------
 } 

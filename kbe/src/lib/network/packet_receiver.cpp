@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 
 #include "packet_receiver.h"
@@ -38,7 +20,7 @@ namespace Network
 //-------------------------------------------------------------------------------------
 PacketReceiver::PacketReceiver() :
 	pEndpoint_(NULL),
-	pNetworkInterface_(NULL)
+	pChannel_(NULL)
 {
 }
 
@@ -46,6 +28,7 @@ PacketReceiver::PacketReceiver() :
 PacketReceiver::PacketReceiver(EndPoint & endpoint,
 	   NetworkInterface & networkInterface	) :
 	pEndpoint_(&endpoint),
+	pChannel_(NULL),
 	pNetworkInterface_(&networkInterface)
 {
 }
@@ -94,7 +77,16 @@ EventDispatcher & PacketReceiver::dispatcher()
 //-------------------------------------------------------------------------------------
 Channel* PacketReceiver::getChannel()
 {
-	return pNetworkInterface_->findChannel(pEndpoint_->addr());
+	if (pChannel_)
+	{
+		if (pChannel_->isDestroyed())
+			return NULL;
+
+		return pChannel_;
+	}
+
+	pChannel_ = pNetworkInterface_->findChannel(pEndpoint_->addr());
+	return pChannel_;
 }
 
 //-------------------------------------------------------------------------------------

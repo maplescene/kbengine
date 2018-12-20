@@ -1,26 +1,26 @@
 LIB =	pyscript
 
-SRCS =				\
-	copy			\
-	install_py_dlls		\
-	map			\
-	math			\
-	pickler			\
-	py_gc			\
-	pystruct		\
-	pyprofile		\
+SRCS =					\
+	copy				\
+	map					\
+	math				\
+	pickler				\
+	py_gc				\
+	pyurl				\
+	pystruct			\
+	pyprofile			\
 	pyprofile_handler	\
 	py_memorystream		\
-	pywatcher		\
-	script			\
+	pywatcher			\
+	script				\
 	scriptobject		\
 	scriptstdout		\
 	scriptstderr		\
 	scriptstdouterr		\
 	scriptstdouterrhook	\
-	sequence		\
-	vector2			\
-	vector3			\
+	sequence			\
+	vector2				\
+	vector3				\
 	vector4
 
 ifndef KBE_ROOT

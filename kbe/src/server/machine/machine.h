@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #ifndef KBE_MACHINE_H
 #define KBE_MACHINE_H
@@ -67,9 +49,8 @@ public:
 	*/
 	void onBroadcastInterface(Network::Channel* pChannel, int32 uid, std::string& username, 
 							COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ID componentIDEx, 
-							COMPONENT_ORDER globalorderid, COMPONENT_ORDER grouporderid,
-							uint32 intaddr, uint16 intport,
-							uint32 extaddr, uint16 extport, std::string& extaddrEx, uint32 pid,
+							COMPONENT_ORDER globalorderid, COMPONENT_ORDER grouporderid, COMPONENT_GUS gus,
+							uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx, uint32 pid,
 							float cpu, float mem, uint32 usedmem, int8 state, uint32 machineID, uint64 extradata,
 							uint64 extradata1, uint64 extradata2, uint64 extradata3, uint32 backRecvAddr, uint16 backRecvPort);
 	
@@ -116,12 +97,14 @@ public:
 	/**
 	* 在linux下启动一个新进程
 	*/
-	uint16 startLinuxProcess(int32 uid, COMPONENT_TYPE componentType, uint64 cid, int16 gus);
+	uint16 startLinuxProcess(int32 uid, COMPONENT_TYPE componentType, uint64 cid, int16 gus, 
+		std::string& KBE_ROOT, std::string& KBE_RES_PATH, std::string& KBE_BIN_PATH);
 #else
 	/**
 	* 在windows下启动一个新进程
 	*/
-	DWORD startWindowsProcess(int32 uid, COMPONENT_TYPE componentType, uint64 cid, int16 gus);
+	DWORD startWindowsProcess(int32 uid, COMPONENT_TYPE componentType, uint64 cid, int16 gus, 
+		std::string& KBE_ROOT, std::string& KBE_RES_PATH, std::string& KBE_BIN_PATH);
 #endif
 
 	/** 网络接口
@@ -129,6 +112,12 @@ public:
 		@uid: 提供启动的uid参数
 	*/
 	void stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+
+	/** 网络接口
+	杀死服务器
+	@uid: 提供启动的uid参数
+	*/
+	void killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/**
 		对本机运行的组件进行检查是否可用

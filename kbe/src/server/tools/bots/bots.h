@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 
 #ifndef KBE_BOTS_H
@@ -92,9 +74,14 @@ public:
 	bool run(void);
 
 	/**
-		由mailbox来尝试获取一个channel的实例
+		由entityCall来尝试获取一个channel的实例
 	*/
-	virtual Network::Channel* findChannelByMailbox(EntityMailbox& mailbox);
+	virtual Network::Channel* findChannelByEntityCall(EntityCallAbstract& entityCall);
+
+	/**
+	通过entity的ID尝试寻找它的实例
+	*/
+	virtual PyObject* tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID);
 
 	/** 网络接口
 		某个app请求查看该app
@@ -200,7 +187,7 @@ public:
 	/** 网络接口
 	   重登陆baseapp成功
 	*/
-	virtual void onReLoginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 
 	/** 网络接口
 		服务器端已经创建了一个与客户端关联的代理Entity
@@ -255,10 +242,11 @@ public:
 	virtual void onUpdatePropertysOptimized(Network::Channel* pChannel, MemoryStream& s);
 
 	/** 网络接口
-		服务器更新avatar基础位置
+		服务器更新avatar基础位置和朝向
 	*/
-	virtual void onUpdateBasePos(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateBasePosXZ(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateBasePos(Network::Channel* pChannel, float x, float y, float z);
+	virtual void onUpdateBasePosXZ(Network::Channel* pChannel, float x, float z);
+	virtual void onUpdateBaseDir(Network::Channel* pChannel, MemoryStream& s);
 
 	/** 网络接口
 		服务器强制设置entity的位置与朝向
@@ -329,6 +317,16 @@ public:
 	*/
 	void startProfile(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	virtual void startProfile_(Network::Channel* pChannel, std::string profileName, int8 profileType, uint32 timelen);
+
+	/** 网络接口
+	    服务器告诉客户端：你当前（取消）控制谁的位移同步
+	*/
+	virtual void onControlEntity(Network::Channel* pChannel, int32 entityID, int8 isControlled);
+
+	/** 网络接口
+		服务器心跳返回
+	*/
+	void onAppActiveTickCB(Network::Channel* pChannel);
 
 protected:
 	PyBots*													pPyBots_;

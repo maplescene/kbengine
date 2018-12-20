@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2016 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #include "helper/profile.h"
 #include "encryption_filter.h"
@@ -61,7 +43,7 @@ BlowfishFilter::~BlowfishFilter()
 }
 
 //-------------------------------------------------------------------------------------
-Reason BlowfishFilter::send(Channel * pChannel, PacketSender& sender, Packet * pPacket)
+Reason BlowfishFilter::send(Channel * pChannel, PacketSender& sender, Packet * pPacket, int userarg)
 {
 	if(!pPacket->encrypted())
 	{
@@ -95,16 +77,33 @@ Reason BlowfishFilter::send(Channel * pChannel, PacketSender& sender, Packet * p
 		pPacket->swap(*(static_cast<KBEngine::MemoryStream*>(pOutPacket)));
 		RECLAIM_PACKET(pPacket->isTCPPacket(), pOutPacket);
 
-		/*
-		if(Network::g_trace_packet > 0)
+		if (Network::g_trace_packet > 0 && Network::g_trace_encrypted_packet)
 		{
-			DEBUG_MSG(fmt::format("BlowfishFilter::send: packetLen={}, padSize={}\n",
-				packetLen, (int)padSize));
-		}
-		*/
-	}
+			if (Network::g_trace_packet_use_logfile)
+				DebugHelper::getSingleton().changeLogger("packetlogs");
 
-	return sender.processFilterPacket(pChannel, pPacket);
+			DEBUG_MSG(fmt::format("<==== BlowfishFilter::send: encryptedLen={}, padSize={}\n",
+				packetLen, (int)padSize));
+
+			switch (Network::g_trace_packet)
+			{
+			case 1:
+				pPacket->hexlike();
+				break;
+			case 2:
+				pPacket->textlike();
+				break;
+			default:
+				pPacket->print_storage();
+				break;
+			};
+
+			if (Network::g_trace_packet_use_logfile)
+				DebugHelper::getSingleton().changeLogger(COMPONENT_NAME_EX(g_componentType));
+		}
+	}
+	
+	return sender.processFilterPacket(pChannel, pPacket, userarg);
 }
 
 //-------------------------------------------------------------------------------------
@@ -144,16 +143,17 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 				
 				packetLen_ -= 1;
 
-				// 如果包是完整下面流出会解密， 如果有多余的内容需要将其剪裁出来待与下一个包合并
+				// 如果包是完整的下面流程会解密， 如果有多余的内容需要将其剪裁出来待与下一个包合并
 				if(pPacket->length() > packetLen_)
 				{
 					MALLOC_PACKET(pPacket_, pPacket->isTCPPacket());
-					pPacket_->append(pPacket->data() + pPacket->rpos() + packetLen_, pPacket->wpos() - (packetLen_ + pPacket->rpos()));
-					pPacket->wpos((int)(pPacket->rpos() + packetLen_));
+					int currLen = pPacket->rpos() + packetLen_;
+					pPacket_->append(pPacket->data() + currLen, pPacket->wpos() - currLen);
+					pPacket->wpos(currLen);
 				}
 				else if(pPacket->length() == packetLen_)
 				{
-					if(pPacket_ != NULL)
+					if(pPacket_ != NULL && pPacket_ == pPacket)
 						pPacket_ = NULL;
 				}
 				else
@@ -175,15 +175,17 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 		else
 		{
 			// 如果上一次有做过解包行为但包还没有完整则继续处理
+			// 如果包是完整的下面流程会解密， 如果有多余的内容需要将其剪裁出来待与下一个包合并
 			if(pPacket->length() > packetLen_)
 			{
 				MALLOC_PACKET(pPacket_, pPacket->isTCPPacket());
-				pPacket_->append(pPacket->data() + pPacket->rpos() + packetLen_, pPacket->wpos() - (packetLen_ + pPacket->rpos()));
-				pPacket->wpos((int)(pPacket->rpos() + packetLen_));
+				int currLen = pPacket->rpos() + packetLen_;
+				pPacket_->append(pPacket->data() + currLen, pPacket->wpos() - currLen);
+				pPacket->wpos(currLen);
 			}
 			else if(pPacket->length() == packetLen_)
 			{
-				if(pPacket_ != NULL)
+				if(pPacket_ != NULL && pPacket_ == pPacket)
 					pPacket_ = NULL;
 			}
 			else
@@ -195,17 +197,36 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 			}
 		}
 
+		if(Network::g_trace_packet > 0 && Network::g_trace_encrypted_packet)
+		{
+			if(Network::g_trace_packet_use_logfile)
+				DebugHelper::getSingleton().changeLogger("packetlogs");
+			
+			DEBUG_MSG(fmt::format("====> BlowfishFilter::recv: encryptedLen={}, padSize={}\n",
+				(packetLen_ + 1), (int)padSize_));
+
+			switch(Network::g_trace_packet)
+			{
+			case 1:
+				pPacket->hexlike();
+				break;
+			case 2:
+				pPacket->textlike();
+				break;
+			default:
+				pPacket->print_storage();
+				break;
+			};
+			
+			if(Network::g_trace_packet_use_logfile)
+				DebugHelper::getSingleton().changeLogger(COMPONENT_NAME_EX(g_componentType));
+		}
+		
 		decrypt(pPacket, pPacket);
 
+		// 上面的流程能保证wpos之后不会有多余的包
+		// 如果有多余的包数据会放在pPacket_
 		pPacket->wpos((int)(pPacket->wpos() - padSize_));
-
-		/*
-		if(Network::g_trace_packet > 0)
-		{
-			DEBUG_MSG(fmt::format("BlowfishFilter::recv: packetLen={}, padSize={}\n",
-				(packetLen_ + 1), (int)padSize_));
-		}
-		*/
 
 		packetLen_ = 0;
 		padSize_ = 0;
@@ -218,6 +239,7 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 				RECLAIM_PACKET(pPacket_->isTCPPacket(), pPacket);
 				pPacket_ = NULL;
 			}
+
 			return ret;
 		}
 
@@ -257,9 +279,9 @@ void BlowfishFilter::encrypt(Packet * pInPacket, Packet * pOutPacket)
 	else
 	{
 		if(pInPacket->isTCPPacket())
-			pOutPacket = TCPPacket::createPoolObject();
+			pOutPacket = TCPPacket::createPoolObject(OBJECTPOOL_POINT);
 		else
-			pOutPacket = UDPPacket::createPoolObject();
+			pOutPacket = UDPPacket::createPoolObject(OBJECTPOOL_POINT);
 
 		pOutPacket->data_resize(pInPacket->size() + 1);
 

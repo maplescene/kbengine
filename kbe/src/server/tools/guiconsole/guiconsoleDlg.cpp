@@ -73,7 +73,7 @@
 
 namespace KBEngine{
 namespace ConsoleInterface{
-	Network::MessageHandlers messageHandlers;
+	Network::MessageHandlers messageHandlers("ConsoleInterface");
 }
 }
 
@@ -190,7 +190,7 @@ public:
 
 			bhandler.newMessage(MachineInterface::onFindInterfaceAddr);
 			MachineInterface::onFindInterfaceAddrArgs7::staticAddToBundle(bhandler, getUserUID(), getUsername(), 
-				dlg->componentType(), dlg->componentID(), (COMPONENT_TYPE)findComponentType, dlg->networkInterface().intaddr().ip, 
+				dlg->componentType(), dlg->componentID(), (COMPONENT_TYPE)findComponentType, dlg->networkInterface().intTcpAddr().ip,
 				bhandler.epListen().addr().port);
 
 			if(!bhandler.broadcast())
@@ -200,7 +200,7 @@ public:
 				return false;
 			}
 
-			MachineInterface::onBroadcastInterfaceArgs24 args;
+			MachineInterface::onBroadcastInterfaceArgs25 args;
 			int32 timeout = 1000000;
 
 RESTART_RECV:
@@ -237,7 +237,7 @@ RESTART_RECV:
 						COMPONENT_NAME_EX((COMPONENT_TYPE)args.componentType), inet_ntoa((struct in_addr&)args.intaddr), ntohs(args.intport)));
 
 					Components::getSingleton().addComponent(args.uid, args.username.c_str(), 
-						(KBEngine::COMPONENT_TYPE)args.componentType, args.componentID, args.globalorderid, args.grouporderid, 
+						(KBEngine::COMPONENT_TYPE)args.componentType, args.componentID, args.globalorderid, args.grouporderid, args.gus,
 						args.intaddr, args.intport, args.extaddr, args.extport, args.extaddrEx, args.pid, args.cpu, args.mem, args.usedmem, 
 						args.extradata, args.extradata1, args.extradata2, args.extradata3);
 					
@@ -255,7 +255,7 @@ RESTART_RECV:
 				}
 				else
 				{
-					ERROR_MSG(fmt::format("CguiconsoleDlg::OnTimer: {} not found. receive data is error!\n",
+					ERROR_MSG(fmt::format("CguiconsoleDlg::OnTimer: {} not found. receive data error!\n",
 						COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType)));
 				}
 
@@ -413,6 +413,7 @@ BOOL CguiconsoleDlg::OnInitDialog()
 	m_ToolBar.ShowWindow(SW_SHOW);
 	RepositionBars(AFX_IDW_CONTROLBAR_FIRST, AFX_IDW_CONTROLBAR_LAST, 0);
 	
+	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &KBEngine::ConsoleInterface::messageHandlers;
 
 	// TODO: Add extra initialization here
 	_dispatcher.breakProcessing(false);
@@ -464,6 +465,10 @@ BOOL CguiconsoleDlg::OnInitDialog()
 	KBEngine::ConsoleInterface::messageHandlers.add("Console::onReceiveProfileData", new KBEngine::ConsoleInterface::ConsoleProfileHandlerArgsStream, NETWORK_VARIABLE_MESSAGE, 
 		new ConsoleProfileHandlerEx);
 
+	KBEngine::Network::Bundle::ObjPool().pMutex(new KBEngine::thread::ThreadMutex());
+	KBEngine::Network::TCPPacket::ObjPool().pMutex(new KBEngine::thread::ThreadMutex());
+	KBEngine::Network::UDPPacket::ObjPool().pMutex(new KBEngine::thread::ThreadMutex());
+	KBEngine::MemoryStream::ObjPool().pMutex(new KBEngine::thread::ThreadMutex());
 	threadPool_.createThreadPool(1, 1, 16);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -586,7 +591,7 @@ void CguiconsoleDlg::commitPythonCommand(CString strCommand)
 	Network::Channel* pChannel = _networkInterface.findChannel(this->getTreeItemAddr(m_tree.GetSelectedItem()));
 	if(pChannel)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		if(getTreeItemComponent(m_tree.GetSelectedItem()) == BASEAPP_TYPE)
 			(*pBundle).newMessage(BaseappInterface::onExecScriptCommand);
 		else if(getTreeItemComponent(m_tree.GetSelectedItem()) == CELLAPP_TYPE)
@@ -845,7 +850,7 @@ void CguiconsoleDlg::OnTimer(UINT_PTR nIDEvent)
 			for(; iter != channels.end(); iter++)
 			{
 				Network::Channel* pChannel = const_cast<KBEngine::Network::Channel*>(iter->second);
-				Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+				Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
 				if(pChannel->proxyID() != BOTS_TYPE)
 				{
@@ -1162,7 +1167,7 @@ void CguiconsoleDlg::reqQueryWatcher(std::string paths)
 
 	if(pChannel)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
 		if(debugComponentType == BOTS_TYPE)
 		{
@@ -1329,6 +1334,14 @@ Network::Address CguiconsoleDlg::getTreeItemAddr(HTREEITEM hItem)
 	sport = sbuf.substr(k + 1, sbuf.find("]"));
 	strutil::kbe_replace(sport, "]", "");
 
+	std::map<CString, CString>::iterator mapiter = m_ipMappings.find(CString(sip.c_str()));
+	if (mapiter != m_ipMappings.end())
+	{
+		buf = KBEngine::strutil::wchar2char(mapiter->second.GetBuffer(0));
+		sip = buf;
+		free(buf);
+	}
+
 	Network::EndPoint endpoint;
 	u_int32_t address;
 	Network::Address::string2ip(sip.c_str(), address);
@@ -1347,7 +1360,7 @@ bool CguiconsoleDlg::connectTo()
 		return false;
 	}
 	
-	Network::EndPoint* endpoint = Network::EndPoint::createPoolObject();
+	Network::EndPoint* endpoint = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
 	endpoint->socket(SOCK_STREAM);
 	if (!endpoint->good())
 	{
@@ -1360,7 +1373,7 @@ bool CguiconsoleDlg::connectTo()
 	if(endpoint->connect(addr.port, addr.ip) == -1)
 	{
 		CString err;
-		err.Format(L"connect server is error! %d", ::WSAGetLastError());
+		err.Format(L"connect server error! %d", ::WSAGetLastError());
 		AfxMessageBox(err);
 		return false;
 	}
@@ -1374,7 +1387,7 @@ bool CguiconsoleDlg::connectTo()
 		Network::Channel::reclaimPoolObject(pChannel);
 	}
 
-	pChannel = Network::Channel::createPoolObject();
+	pChannel = Network::Channel::createPoolObject(OBJECTPOOL_POINT);
 	bool ret = pChannel->initialize(_networkInterface, endpoint, Network::Channel::INTERNAL);
 	if(!ret)
 	{
@@ -1576,7 +1589,7 @@ void CguiconsoleDlg::OnNMClickTree1(NMHDR *pNMHDR, LRESULT *pResult)
 	{
 		HTREEITEM hItem = m_tree.GetSelectedItem(); 
 		KBEngine::Network::Address addr = getTreeItemAddr(hItem);
-		m_logWnd.onConnectStatus(changeToChecked, addr);
+		m_logWnd.onConnectionState(changeToChecked, addr);
 	}
 }
 
@@ -1698,8 +1711,10 @@ void CguiconsoleDlg::OnToolBar_StopServer()
 		bhandler.newMessage(MachineInterface::stopserver);
 		bhandler << KBEngine::getUserUID();
 		bhandler << componentType;
-
-		uint32 ip = _networkInterface.intaddr().ip;
+		KBEngine::COMPONENT_ID cid = 0;
+		bhandler << cid;
+		
+		uint32 ip = _networkInterface.intTcpAddr().ip;
 		uint16 port = bhandler.epListen().addr().port;
 		bhandler << ip << port;
 
@@ -1750,7 +1765,7 @@ bool CguiconsoleDlg::startProfile(std::string name, int8 type, uint32 timinglen)
 	Network::Channel* pChannel = _networkInterface.findChannel(this->getTreeItemAddr(m_tree.GetSelectedItem()));
 	if(pChannel)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		if(getTreeItemComponent(m_tree.GetSelectedItem()) == BASEAPP_TYPE)
 			(*pBundle).newMessage(BaseappInterface::startProfile);
 		else if(getTreeItemComponent(m_tree.GetSelectedItem()) == BASEAPPMGR_TYPE)
